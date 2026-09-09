@@ -1,0 +1,896 @@
+
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Bike Benchmarking Tool</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --accent-color: #2563eb;
+            --accent-hover: #1d4ed8;
+            --text-color: #f8fafc;
+            --text-muted: #94a3b8;
+            --border-color: #334155;
+            --success-color: #16a34a;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { background-color: var(--bg-color); color: var(--text-color); padding: 12px; display: flex; justify-content: center; }
+        .container { width: 100%; max-width: 600px; background: var(--card-bg); border-radius: 12px; padding: 16px; border: 1px solid var(--border-color); }
+        
+        h1 { font-size: 1.25rem; color: #38bdf8; text-align: center; margin-bottom: 4px; }
+        .subtitle { font-size: 0.8rem; color: var(--text-muted); text-align: center; margin-bottom: 16px; }
+
+        .progress-container { width: 100%; background: var(--border-color); height: 6px; border-radius: 3px; margin-bottom: 16px; overflow: hidden; }
+        .progress-bar { height: 100%; background: var(--accent-color); width: 20%; transition: width 0.3s ease; }
+
+        .step { display: none; }
+        .step.active { display: block; }
+        .step-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 12px; border-bottom: 1px solid var(--border-color); padding-bottom: 6px; color: #f1f5f9; }
+
+        .form-group { margin-bottom: 16px; }
+        label { display: block; font-size: 0.85rem; font-weight: 500; margin-bottom: 4px; color: var(--text-muted); }
+        input[type="text"], input[type="number"], select, textarea {
+            width: 100%; padding: 10px; border-radius: 6px; border: 1px solid var(--border-color);
+            background: #0f172a; color: var(--text-color); font-size: 0.95rem; outline: none;
+        }
+        input:focus, select:focus, textarea:focus { border-color: var(--accent-color); }
+        textarea { resize: vertical; min-height: 65px; }
+
+        /* Photo Box & Multi Gallery */
+        .photo-box {
+            border: 2px dashed var(--border-color); padding: 10px; text-align: center; border-radius: 8px;
+            background: #0f172a; margin-bottom: 6px;
+        }
+        .btn-cam {
+            background: #0284c7; color: #fff; border: none; padding: 8px 12px; border-radius: 6px;
+            font-size: 0.85rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; margin-bottom: 4px;
+        }
+        .photo-preview { margin-top: 6px; max-height: 130px; border-radius: 6px; display: none; margin-left: auto; margin-right: auto; border: 1px solid var(--border-color); }
+
+        /* Multi Gallery Grid */
+        .gallery-grid {
+            display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; justify-content: center;
+        }
+        .thumb-wrap {
+            position: relative; width: 70px; height: 70px; border-radius: 6px; overflow: hidden; border: 1px solid var(--border-color);
+        }
+        .thumb-wrap img { width: 100%; height: 100%; object-fit: cover; }
+        .btn-del-img {
+            position: absolute; top: 2px; right: 2px; background: rgba(220, 38, 38, 0.9); color: #fff;
+            border: none; width: 18px; height: 18px; border-radius: 50%; font-size: 10px; font-weight: bold; cursor: pointer;
+        }
+
+        /* Voice Input Button */
+        .voice-btn {
+            background: #334155; color: #fff; border: none; padding: 6px 10px; border-radius: 4px;
+            font-size: 0.75rem; margin-top: 4px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;
+        }
+        .voice-btn.recording { background: #dc2626; animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
+
+        /* Navigation Buttons */
+        .btn-group { display: flex; justify-content: space-between; gap: 10px; margin-top: 20px; }
+        button.btn {
+            flex: 1; padding: 12px; border: none; border-radius: 6px; font-weight: 600; font-size: 0.95rem; cursor: pointer;
+        }
+        .btn-prev { background: var(--border-color); color: var(--text-color); }
+        .btn-next { background: var(--accent-color); color: #fff; }
+        .btn-export { background: var(--success-color); color: #fff; width: 100%; margin-top: 10px; font-size: 1rem; }
+        .btn-secondary { background: #0284c7; color: #fff; width: 100%; margin-top: 8px; }
+
+        /* FULLSCREEN CAMERA MODAL */
+        .camera-modal {
+            display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: #000; z-index: 9999; flex-direction: column; justify-content: space-between; align-items: center;
+        }
+        .camera-modal.active { display: flex; }
+        .viewfinder { position: relative; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; overflow: hidden; background: #000; }
+        .viewfinder video { width: 100%; height: 100%; object-fit: cover; }
+
+        .cam-controls {
+            position: absolute; bottom: 0; left: 0; width: 100%; padding-top: 20px;
+            padding-bottom: max(80px, env(safe-area-inset-bottom) + 60px);
+            background: linear-gradient(to top, rgba(15, 23, 42, 0.95) 0%, rgba(15, 23, 42, 0.7) 70%, transparent 100%);
+            display: flex; justify-content: space-around; align-items: center; z-index: 10000;
+        }
+        .btn-snap {
+            width: 72px; height: 72px; border-radius: 50%; background: #ef4444; border: 4px solid #ffffff;
+            cursor: pointer; box-shadow: 0 0 16px rgba(239, 68, 68, 0.8);
+        }
+        .btn-snap:active { transform: scale(0.92); }
+        .btn-close-cam { background: #334155; color: #fff; border: 1px solid var(--border-color); padding: 12px 18px; border-radius: 8px; font-weight: 600; font-size: 0.9rem; }
+
+        .output-box { background: #0f172a; padding: 10px; border-radius: 6px; font-family: monospace; font-size: 0.75rem; overflow-x: auto; white-space: pre; border: 1px solid var(--border-color); margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🚲 Bike Benchmarking Tool</h1>
+    <div class="subtitle">Master-Dokument Datenerfassung</div>
+
+    <div class="progress-container">
+        <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <form id="benchmarkForm">
+        <!-- SCHRITT 1: Stammdaten -->
+        <div class="step active" id="step1">
+            <div class="step-title">Schritt 1: Stammdaten</div>
+            <div class="form-group">
+                <label>Hersteller / Marke*</label>
+                <input type="text" id="marke" placeholder="z.B. Riese & Müller, Specialized">
+            </div>
+            <div class="form-group">
+                <label>Modellbezeichnung*</label>
+                <input type="text" id="modell" placeholder="z.B. Nevo4 GT Touring">
+            </div>
+            <div class="form-group">
+                <label>Modelljahr</label>
+                <select id="modelljahr">
+                    <option value="2026">2026</option>
+                    <option value="2025" selected>2025</option>
+                    <option value="2024">2024</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Kategorie</label>
+                <select id="kategorie">
+                    <option value="Trekking / SUV">Trekking / SUV</option>
+                    <option value="City / Urban">City / Urban</option>
+                    <option value="E-MTB">E-MTB</option>
+                    <option value="Cargo">Cargo</option>
+                    <option value="Compact">Compact</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>UVP (€)</label>
+                <input type="number" id="uvp" placeholder="z.B. 4999">
+            </div>
+        </div>
+
+        <!-- SCHRITT 2: Standard Fotodokumentation -->
+        <div class="step" id="step2">
+            <div class="step-title">Schritt 2: Fotodokumentation (Hauptansichten)</div>
+            
+            <div class="form-group">
+                <label>1. Seitenansicht (Antriebsseite rechts)</label>
+                <div class="photo-box">
+                    <button type="button" class="btn-cam" onclick="openCameraSingle('prevSeite')">📸 Kamera öffnen</button><br>
+                    <input type="file" id="fotoSeite" accept="image/*" style="display:none;" onchange="previewSingleFile(this, 'prevSeite')">
+                    <small style="color:var(--text-muted); cursor:pointer;" onclick="document.getElementById('fotoSeite').click()">Oder aus Galerie wählen</small>
+                    <img id="prevSeite" class="photo-preview">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>2. Frontansicht & Cockpit (Kabelführung / Licht)</label>
+                <div class="photo-box">
+                    <button type="button" class="btn-cam" onclick="openCameraSingle('prevFront')">📸 Kamera öffnen</button><br>
+                    <input type="file" id="fotoFront" accept="image/*" style="display:none;" onchange="previewSingleFile(this, 'prevFront')">
+                    <small style="color:var(--text-muted); cursor:pointer;" onclick="document.getElementById('fotoFront').click()">Oder aus Galerie wählen</small>
+                    <img id="prevFront" class="photo-preview">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>3. Motor & Tretlagerbereich</label>
+                <div class="photo-box">
+                    <button type="button" class="btn-cam" onclick="openCameraSingle('prevMotor')">📸 Kamera öffnen</button><br>
+                    <input type="file" id="fotoMotor" accept="image/*" style="display:none;" onchange="previewSingleFile(this, 'prevMotor')">
+                    <small style="color:var(--text-muted); cursor:pointer;" onclick="document.getElementById('fotoMotor').click()">Oder aus Galerie wählen</small>
+                    <img id="prevMotor" class="photo-preview">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>4. Heck & Gepäckträger-Anbindung</label>
+                <div class="photo-box">
+                    <button type="button" class="btn-cam" onclick="openCameraSingle('prevHeck')">📸 Kamera öffnen</button><br>
+                    <input type="file" id="fotoHeck" accept="image/*" style="display:none;" onchange="previewSingleFile(this, 'prevHeck')">
+                    <small style="color:var(--text-muted); cursor:pointer;" onclick="document.getElementById('fotoHeck').click()">Oder aus Galerie wählen</small>
+                    <img id="prevHeck" class="photo-preview">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>5. Schweißnähte & Verarbeitungsdetail</label>
+                <div class="photo-box">
+                    <button type="button" class="btn-cam" onclick="openCameraSingle('prevDetail')">📸 Kamera öffnen</button><br>
+                    <input type="file" id="fotoDetail" accept="image/*" style="display:none;" onchange="previewSingleFile(this, 'prevDetail')">
+                    <small style="color:var(--text-muted); cursor:pointer;" onclick="document.getElementById('fotoDetail').click()">Oder aus Galerie wählen</small>
+                    <img id="prevDetail" class="photo-preview">
+                </div>
+            </div>
+        </div>
+
+        <!-- SCHRITT 3: Hardware & E-System -->
+        <div class="step" id="step3">
+            <div class="step-title">Schritt 3: Hardware & E-System</div>
+            <div class="form-group">
+                <label>Rahmenmaterial</label>
+                <select id="rahmenmaterial">
+                    <option value="Aluminium 6061">Aluminium 6061</option>
+                    <option value="Carbon">Carbon</option>
+                    <option value="Stahl">Stahl</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Rahmenform</label>
+                <select id="rahmenform">
+                    <option value="Wave / Tiefeinsteiger">Wave / Tiefeinsteiger</option>
+                    <option value="Diamond / Herren">Diamond / Herren</option>
+                    <option value="Trapez">Trapez</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Schweißnaht-Finish</label>
+                <select id="schweissnaht">
+                    <option value="Smooth Welded (verschliffen)">Smooth Welded (verschliffen)</option>
+                    <option value="Standard TIG (Raupe)">Standard TIG (Raupe)</option>
+                    <option value="Carbon Monocoque">Carbon Monocoque</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Kabelführung (ICR)</label>
+                <select id="kabelfuehrung">
+                    <option value="Vollintegriert (Steuersatz/Vorbau)">Vollintegriert (Steuersatz/Vorbau)</option>
+                    <option value="Unterrohr-Eingang">Unterrohr-Eingang</option>
+                    <option value="Außen verlegt">Außen verlegt</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Gabel</label>
+                <input type="text" id="gabel" placeholder="z.B. SR Suntour Mobie34 100mm">
+            </div>
+            <div class="form-group">
+                <label>Sattelstütze</label>
+                <input type="text" id="sattelstuetze" placeholder="z.B. Parallelogramm gefedert">
+            </div>
+            <div class="form-group">
+                <label>Motor Modell</label>
+                <input type="text" id="motor" placeholder="z.B. Bosch Performance Line CX">
+            </div>
+            <div class="form-group">
+                <label>Max. Drehmoment (Nm)</label>
+                <input type="number" id="drehmoment" placeholder="z.B. 85">
+            </div>
+            <div class="form-group">
+                <label>Akku Kapazität (Wh)</label>
+                <input type="number" id="akku" placeholder="z.B. 750">
+            </div>
+            <div class="form-group">
+                <label>Akku-Integration</label>
+                <select id="akkuIntegration">
+                    <option value="Vollintegriert (Entnahme unten)">Vollintegriert (Entnahme unten)</option>
+                    <option value="Vollintegriert (Entnahme seitlich/oben)">Vollintegriert (Entnahme seitlich/oben)</option>
+                    <option value="Semi-integriert">Semi-integriert</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Display & Remote</label>
+                <input type="text" id="display" placeholder="z.B. Bosch Kiox 300 + LED Remote">
+            </div>
+        </div>
+
+        <!-- SCHRITT 4: Schaltung, Bremse, Anbauteile (OHNE KETTIENKASTEN) -->
+        <div class="step" id="step4">
+            <div class="step-title">Schritt 4: Antrieb & Fahrwerk</div>
+            <div class="form-group">
+                <label>Schaltungstyp</label>
+                <select id="schaltungstyp">
+                    <option value="Kettenschaltung">Kettenschaltung</option>
+                    <option value="Nabenschaltung stufenlos (Enviolo)">Nabenschaltung stufenlos (Enviolo)</option>
+                    <option value="Nabenschaltung (Rohloff/Shimano)">Nabenschaltung (Rohloff/Shimano)</option>
+                    <option value="Tretlagergetriebe (Pinion)">Tretlagergetriebe (Pinion)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Schaltung Modell</label>
+                <input type="text" id="schaltungModell" placeholder="z.B. Shimano XT Linkglide 11-fach">
+            </div>
+            <div class="form-group">
+                <label>Antriebsmedium</label>
+                <select id="antriebsmedium">
+                    <option value="Kette">Kette</option>
+                    <option value="Zahnriemen (Gates CDX)">Zahnriemen (Gates CDX)</option>
+                    <option value="Zahnriemen (Gates CDN)">Zahnriemen (Gates CDN)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Bremsanlage</label>
+                <input type="text" id="bremse" placeholder="z.B. Magura MT4/MT2 4-Kolben">
+            </div>
+            <div class="form-group">
+                <label>Bremsscheiben (v/h in mm)</label>
+                <input type="text" id="bremsscheiben" placeholder="z.B. 203 mm / 180 mm">
+            </div>
+            <div class="form-group">
+                <label>Laufräder / Felgen</label>
+                <input type="text" id="laufraeder" placeholder="z.B. 27.5'' Rodi Tryp35">
+            </div>
+            <div class="form-group">
+                <label>Bereifung</label>
+                <input type="text" id="bereifung" placeholder="z.B. Schwalbe Johnny Watts 60-584">
+            </div>
+        </div>
+
+        <!-- SCHRITT 5: Detaillierte Wertigkeit - INKLUSIVE KETTENKASTEN (ALLE MULTI-FOTO) -->
+        <div class="step" id="step5">
+            <div class="step-title">Schritt 5: Eigenentwicklung & Detailevaluation</div>
+            
+            <!-- 1. GEPÄCKTRÄGER -->
+            <div class="form-group">
+                <label>Gepäckträger (Befestigung, Traglast, System)</label>
+                <textarea id="gepaecktraeger" placeholder="z.B. Direkte Schutzblech-Befestigung, Racktime Snapit 2.0, 27kg Traglast..."></textarea>
+                <button type="button" class="voice-btn" onclick="startDictation('gepaecktraeger')">🎙️ Sprachmemo starten</button>
+                <div class="photo-box" style="margin-top:6px;">
+                    <button type="button" class="btn-cam" onclick="openCameraMulti('gepaecktraeger')">📸 Gepäckträger Foto hinzufügen</button><br>
+                    <input type="file" id="file_gepaecktraeger" accept="image/*" multiple style="display:none;" onchange="addFilesMulti(this, 'gepaecktraeger')">
+                    <small style="color:var(--text-muted); cursor:pointer;" onclick="document.getElementById('file_gepaecktraeger').click()">Oder mehrere aus Galerie wählen</small>
+                    <div class="gallery-grid" id="gallery_gepaecktraeger"></div>
+                </div>
+            </div>
+
+            <!-- 2. SCHUTZBLECHE -->
+            <div class="form-group">
+                <label>Schutzbleche (Material, Steifigkeit)</label>
+                <textarea id="schutzbleche" placeholder="z.B. Alu-Extrusionsprofil, sehr verwindungssteif, klapperfrei..."></textarea>
+                <button type="button" class="voice-btn" onclick="startDictation('schutzbleche')">🎙️ Sprachmemo starten</button>
+                <div class="photo-box" style="margin-top:6px;">
+                    <button type="button" class="btn-cam" onclick="openCameraMulti('schutzbleche')">📸 Schutzbleche Foto hinzufügen</button><br>
+                    <input type="file" id="file_schutzbleche" accept="image/*" multiple style="display:none;" onchange="addFilesMulti(this, 'schutzbleche')">
+                    <small style="color:var(--text-muted); cursor:pointer;" onclick="document.getElementById('file_schutzbleche').click()">Oder mehrere aus Galerie wählen</small>
+                    <div class="gallery-grid" id="gallery_schutzbleche"></div>
+                </div>
+            </div>
+
+            <!-- 3. BELEUCHTUNG -->
+            <div class="form-group">
+                <label>Beleuchtung Vorne & Hinten</label>
+                <textarea id="beleuchtung" placeholder="z.B. Supernova Mini 2 Pro mit Fernlicht, Rücklicht im Träger integriert..."></textarea>
+                <button type="button" class="voice-btn" onclick="startDictation('beleuchtung')">🎙️ Sprachmemo starten</button>
+                <div class="photo-box" style="margin-top:6px;">
+                    <button type="button" class="btn-cam" onclick="openCameraMulti('beleuchtung')">📸 Beleuchtung Foto hinzufügen</button><br>
+                    <input type="file" id="file_beleuchtung" accept="image/*" multiple style="display:none;" onchange="addFilesMulti(this, 'beleuchtung')">
+                    <small style="color:var(--text-muted); cursor:pointer;" onclick="document.getElementById('file_beleuchtung').click()">Oder mehrere aus Galerie wählen</small>
+                    <div class="gallery-grid" id="gallery_beleuchtung"></div>
+                </div>
+            </div>
+
+            <!-- 4. VORBAU & LENKER -->
+            <div class="form-group">
+                <label>Vorbau & Lenker (Integration, Winkel)</label>
+                <textarea id="vorbau" placeholder="z.B. Verstellbarer Vorbau mit integrierter Kabelführung (ICR)..."></textarea>
+                <button type="button" class="voice-btn" onclick="startDictation('vorbau')">🎙️ Sprachmemo starten</button>
+                <div class="photo-box" style="margin-top:6px;">
+                    <button type="button" class="btn-cam" onclick="openCameraMulti('vorbau')">📸 Vorbau / Lenker Foto hinzufügen</button><br>
+                    <input type="file" id="file_vorbau" accept="image/*" multiple style="display:none;" onchange="addFilesMulti(this, 'vorbau')">
+                    <small style="color:var(--text-muted); cursor:pointer;" onclick="document.getElementById('file_vorbau').click()">Oder mehrere aus Galerie wählen</small>
+                    <div class="gallery-grid" id="gallery_vorbau"></div>
+                </div>
+            </div>
+
+            <!-- 5. KETTENKASTEN / KETTENSCHUTZ (NEU IN SCHRITT 5 INTEGRATED) -->
+            <div class="form-group">
+                <label>Kettenkasten / Kettenschutz (Integration, Abdeckung, Passform)</label>
+                <textarea id="kettenkasten" placeholder="z.B. Hesling Vollschutz, Kettenschutzschiene Alu, Nahtspalt, Klapperfreiheit..."></textarea>
+                <button type="button" class="voice-btn" onclick="startDictation('kettenkasten')">🎙️ Sprachmemo starten</button>
+                <div class="photo-box" style="margin-top:6px;">
+                    <button type="button" class="btn-cam" onclick="openCameraMulti('kettenkasten')">📸 Kettenkasten Foto hinzufügen</button><br>
+                    <input type="file" id="file_kettenkasten" accept="image/*" multiple style="display:none;" onchange="addFilesMulti(this, 'kettenkasten')">
+                    <small style="color:var(--text-muted); cursor:pointer;" onclick="document.getElementById('file_kettenkasten').click()">Oder mehrere aus Galerie wählen</small>
+                    <div class="gallery-grid" id="gallery_kettenkasten"></div>
+                </div>
+            </div>
+
+            <!-- 6. MOTORCOVER -->
+            <div class="form-group">
+                <label>Motorcover (Passform, Material, Kühlung, Haptik)</label>
+                <textarea id="motorcover" placeholder="z.B. Kunststoffspritzguss mit Belüftungsschlitzen, Passform Nahtspalt < 1mm..."></textarea>
+                <button type="button" class="voice-btn" onclick="startDictation('motorcover')">🎙️ Sprachmemo starten</button>
+                <div class="photo-box" style="margin-top:6px;">
+                    <button type="button" class="btn-cam" onclick="openCameraMulti('motorcover')">📸 Motorcover Foto hinzufügen</button><br>
+                    <input type="file" id="file_motorcover" accept="image/*" multiple style="display:none;" onchange="addFilesMulti(this, 'motorcover')">
+                    <small style="color:var(--text-muted); cursor:pointer;" onclick="document.getElementById('file_motorcover').click()">Oder mehrere aus Galerie wählen</small>
+                    <div class="gallery-grid" id="gallery_motorcover"></div>
+                </div>
+            </div>
+
+            <!-- 7. BATTERIECOVER -->
+            <div class="form-group">
+                <label>Batteriecover (Verriegelung, Dichtung, Finish)</label>
+                <textarea id="batteriecover" placeholder="z.B. Alu-Abdeckung lackiert, Drehverschluss mit Klick-Feedback, umlaufende Gummidichtung..."></textarea>
+                <button type="button" class="voice-btn" onclick="startDictation('batteriecover')">🎙️ Sprachmemo starten</button>
+                <div class="photo-box" style="margin-top:6px;">
+                    <button type="button" class="btn-cam" onclick="openCameraMulti('batteriecover')">📸 Batteriecover Foto hinzufügen</button><br>
+                    <input type="file" id="file_batteriecover" accept="image/*" multiple style="display:none;" onchange="addFilesMulti(this, 'batteriecover')">
+                    <small style="color:var(--text-muted); cursor:pointer;" onclick="document.getElementById('file_batteriecover').click()">Oder mehrere aus Galerie wählen</small>
+                    <div class="gallery-grid" id="gallery_batteriecover"></div>
+                </div>
+            </div>
+
+            <!-- 8. CHARGE PORT COVER -->
+            <div class="form-group">
+                <label>Charge Port Cover (Ladebuchsenabdeckung)</label>
+                <textarea id="chargeport" placeholder="z.B. Magnetischer Klappmechanismus, Federunterstützt, einhändig bedienbar..."></textarea>
+                <button type="button" class="voice-btn" onclick="startDictation('chargeport')">🎙️ Sprachmemo starten</button>
+                <div class="photo-box" style="margin-top:6px;">
+                    <button type="button" class="btn-cam" onclick="openCameraMulti('chargeport')">📸 Charge Port Foto hinzufügen</button><br>
+                    <input type="file" id="file_chargeport" accept="image/*" multiple style="display:none;" onchange="addFilesMulti(this, 'chargeport')">
+                    <small style="color:var(--text-muted); cursor:pointer;" onclick="document.getElementById('file_chargeport').click()">Oder mehrere aus Galerie wählen</small>
+                    <div class="gallery-grid" id="gallery_chargeport"></div>
+                </div>
+            </div>
+
+            <!-- 9. SATTELROHRKLEMME -->
+            <div class="form-group">
+                <label>Sattelrohrklemme (Integration, Klemmschraube, Design)</label>
+                <textarea id="sattelrohrklemme" placeholder="z.B. In den Rahmen integrierte Keilklemmung (Internal Clamp), 2-Schrauben-Fixierung..."></textarea>
+                <button type="button" class="voice-btn" onclick="startDictation('sattelrohrklemme')">🎙️ Sprachmemo starten</button>
+                <div class="photo-box" style="margin-top:6px;">
+                    <button type="button" class="btn-cam" onclick="openCameraMulti('sattelrohrklemme')">📸 Sattelrohrklemme Foto hinzufügen</button><br>
+                    <input type="file" id="file_sattelrohrklemme" accept="image/*" multiple style="display:none;" onchange="addFilesMulti(this, 'sattelrohrklemme')">
+                    <small style="color:var(--text-muted); cursor:pointer;" onclick="document.getElementById('file_sattelrohrklemme').click()">Oder mehrere aus Galerie wählen</small>
+                    <div class="gallery-grid" id="gallery_sattelrohrklemme"></div>
+                </div>
+            </div>
+
+            <!-- 10. SONSTIGE BESONDERHEITEN -->
+            <div class="form-group">
+                <label>Sonstige Besonderheiten & Haptik</label>
+                <textarea id="besonderheiten" placeholder="z.B. Gesamteindruck Verarbeitungsqualität, auffällige Spaltmaße..."></textarea>
+                <button type="button" class="voice-btn" onclick="startDictation('besonderheiten')">🎙️ Sprachmemo starten</button>
+                <div class="photo-box" style="margin-top:6px;">
+                    <button type="button" class="btn-cam" onclick="openCameraMulti('besonderheiten')">📸 Haptik / Details Foto hinzufügen</button><br>
+                    <input type="file" id="file_besonderheiten" accept="image/*" multiple style="display:none;" onchange="addFilesMulti(this, 'besonderheiten')">
+                    <small style="color:var(--text-muted); cursor:pointer;" onclick="document.getElementById('file_besonderheiten').click()">Oder mehrere aus Galerie wählen</small>
+                    <div class="gallery-grid" id="gallery_besonderheiten"></div>
+                </div>
+            </div>
+
+            <button type="button" class="btn btn-export" onclick="downloadZipPackage()">📦 ZIP-Archiv (CSV + Alle Fotos) herunterladen</button>
+            <button type="button" class="btn btn-secondary" onclick="generateExportCSV()">📄 Nur CSV herunterladen</button>
+            <button type="button" class="btn btn-next" style="margin-top:6px; background:#475569;" onclick="copyToClipboard()">📋 Zeile für Google Sheets kopieren</button>
+
+            <div class="output-box" id="outputBox" style="display:none;"></div>
+        </div>
+
+        <div class="btn-group">
+            <button type="button" class="btn btn-prev" id="prevBtn" onclick="changeStep(-1)" style="display:none;">Zurück</button>
+            <button type="button" class="btn btn-next" id="nextBtn" onclick="changeStep(1)">Weiter</button>
+        </div>
+    </form>
+</div>
+
+<!-- LIVE CAMERA MODAL -->
+<div class="camera-modal" id="cameraModal">
+    <div class="viewfinder">
+        <video id="webcam" autoplay playsinline></video>
+    </div>
+    <div class="cam-controls">
+        <button type="button" class="btn-close-cam" onclick="closeCamera()">Abbrechen</button>
+        <button type="button" class="btn-snap" onclick="takeSnapshot()"></button>
+        <div style="width:80px;"></div>
+    </div>
+</div>
+
+<canvas id="snapshotCanvas" style="display:none;"></canvas>
+
+<script>
+    let currentStep = 1;
+    const totalSteps = 5;
+    let cameraMode = 'single'; // 'single' or 'multi'
+    let activePreviewTargetId = null;
+    let activeTopicKey = null;
+    let cameraStream = null;
+
+    // Multi-photo store for ALL Step 5 components
+    const multiPhotos = {
+        gepaecktraeger: [],
+        schutzbleche: [],
+        beleuchtung: [],
+        vorbau: [],
+        kettenkasten: [],
+        motorcover: [],
+        batteriecover: [],
+        chargeport: [],
+        sattelrohrklemme: [],
+        besonderheiten: []
+    };
+
+    function updateWizard() {
+        for (let i = 1; i <= totalSteps; i++) {
+            document.getElementById(`step${i}`).classList.remove('active');
+        }
+        document.getElementById(`step${currentStep}`).classList.add('active');
+        document.getElementById('progressBar').style.width = `${(currentStep / totalSteps) * 100}%`;
+        document.getElementById('prevBtn').style.display = currentStep === 1 ? 'none' : 'block';
+        document.getElementById('nextBtn').style.display = currentStep === totalSteps ? 'none' : 'block';
+    }
+
+    function changeStep(delta) {
+        if (currentStep + delta >= 1 && currentStep + delta <= totalSteps) {
+            currentStep += delta;
+            updateWizard();
+        }
+    }
+
+    /* CAMERA CONTROLS */
+    async function initCameraStream() {
+        const modal = document.getElementById('cameraModal');
+        const video = document.getElementById('webcam');
+        try {
+            cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { exact: "environment" } }, audio: false });
+        } catch (err) {
+            try {
+                cameraStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+            } catch (fallbackErr) {
+                alert("Kamera-Zugriff nicht möglich. Bitte nutze den Galerie-Upload.");
+                return false;
+            }
+        }
+        video.srcObject = cameraStream;
+        modal.classList.add('active');
+        return true;
+    }
+
+    async function openCameraSingle(targetPreviewId) {
+        cameraMode = 'single';
+        activePreviewTargetId = targetPreviewId;
+        await initCameraStream();
+    }
+
+    async function openCameraMulti(topicKey) {
+        cameraMode = 'multi';
+        activeTopicKey = topicKey;
+        await initCameraStream();
+    }
+
+    function closeCamera() {
+        document.getElementById('cameraModal').classList.remove('active');
+        if (cameraStream) cameraStream.getTracks().forEach(track => track.stop());
+    }
+
+    function takeSnapshot() {
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('snapshotCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = video.videoWidth || 1280;
+        canvas.height = video.videoHeight || 720;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+
+        if (cameraMode === 'single') {
+            const img = document.getElementById(activePreviewTargetId);
+            img.src = dataUrl;
+            img.style.display = 'block';
+        } else if (cameraMode === 'multi') {
+            multiPhotos[activeTopicKey].push(dataUrl);
+            renderGallery(activeTopicKey);
+        }
+        closeCamera();
+    }
+
+    /* MULTI-PHOTO GALLERY MANAGEMENT */
+    function addFilesMulti(input, topicKey) {
+        if (input.files && input.files.length > 0) {
+            Array.from(input.files).forEach(file => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    multiPhotos[topicKey].push(e.target.result);
+                    renderGallery(topicKey);
+                }
+                reader.readAsDataURL(file);
+            });
+        }
+    }
+
+    function renderGallery(topicKey) {
+        const container = document.getElementById(`gallery_${topicKey}`);
+        if (!container) return;
+        container.innerHTML = '';
+        multiPhotos[topicKey].forEach((dataUrl, idx) => {
+            const wrap = document.createElement('div');
+            wrap.className = 'thumb-wrap';
+            wrap.innerHTML = `
+                <img src="${dataUrl}">
+                <button type="button" class="btn-del-img" onclick="removePhoto('${topicKey}', ${idx})">✕</button>
+            `;
+            container.appendChild(wrap);
+        });
+    }
+
+    function removePhoto(topicKey, index) {
+        multiPhotos[topicKey].splice(index, 1);
+        renderGallery(topicKey);
+    }
+
+    function previewSingleFile(input, previewId) {
+        if (input.files && input.files) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = document.getElementById(previewId);
+                img.src = e.target.result;
+                img.style.display = 'block';
+            }
+            reader.readAsDataURL(input.files);
+        }
+    }
+
+    /* VOICE DICTATION */
+    function startDictation(targetId) {
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            const recognition = new SpeechRecognition();
+            recognition.lang = 'de-DE';
+            const btn = event.target;
+            btn.classList.add('recording');
+            btn.innerText = '🔴 Höre zu...';
+            recognition.start();
+            recognition.onresult = function(event) {
+                const transcript = event.results.transcript;
+                const field = document.getElementById(targetId);
+                field.value = field.value ? field.value + " " + transcript : transcript;
+            };
+            recognition.onend = function() {
+                btn.classList.remove('recording');
+                btn.innerText = '🎙️ Sprachmemo starten';
+            };
+        } else {
+            alert("Spracherkennung wird auf diesem Gerät nicht unterstützt.");
+        }
+    }
+
+    /* DATA EXTRACTION WITH STRICT "N/A" */
+    function getValue(id) {
+        const el = document.getElementById(id);
+        if (!el) return "N/A";
+        const val = el.value.trim();
+        return val === "" ? "N/A" : val;
+    }
+
+    function getMultiPhotoCountText(topicKey) {
+        const count = multiPhotos[topicKey] ? multiPhotos[topicKey].length : 0;
+        return count > 0 ? `${count} Foto(s) erfasst` : "N/A";
+    }
+
+    function collectMasterData() {
+        return [
+            getValue('marke'),               // Spalte A
+            getValue('modell'),              // Spalte B
+            getValue('modelljahr'),          // Spalte C
+            getValue('kategorie'),           // Spalte D
+            getValue('uvp'),                 // Spalte E
+            document.getElementById('prevSeite').src ? "01_Seitenansicht_Antriebsseite.jpg" : "N/A", // Spalte F
+            document.getElementById('prevFront').src ? "02_Front_Kabelfuehrung.jpg" : "N/A",         // Spalte G
+            document.getElementById('prevMotor').src ? "03_Tretlager_Motorintegration.jpg" : "N/A",    // Spalte H
+            document.getElementById('prevHeck').src ? "04_Gepaecktraeger_Schutzblech.jpg" : "N/A",    // Spalte I
+            document.getElementById('prevDetail').src ? "05_Schweissnaht_Verarbeitung.jpg" : "N/A",    // Spalte J
+            getValue('rahmenmaterial'),      // Spalte K
+            getValue('rahmenform'),          // Spalte L
+            getValue('schweissnaht'),        // Spalte M
+            getValue('kabelfuehrung'),       // Spalte N
+            getValue('gabel'),               // Spalte O
+            getValue('sattelstuetze'),       // Spalte P
+            getValue('motor'),              // Spalte Q
+            getValue('drehmoment'),          // Spalte R
+            getValue('akku'),                // Spalte S
+            getValue('akkuIntegration'),     // Spalte T
+            getValue('display'),             // Spalte U
+            getValue('schaltungstyp'),       // Spalte V
+            getValue('schaltungModell'),     // Spalte W
+            getValue('antriebsmedium'),      // Spalte X
+            getValue('bremse'),              // Spalte Y
+            getValue('bremsscheiben'),       // Spalte Z
+            getValue('laufraeder'),          // Spalte AA
+            getValue('bereifung'),           // Spalte AB
+            getValue('gepaecktraeger'),      // Spalte AC
+            getMultiPhotoCountText('gepaecktraeger'), // Spalte AD
+            getValue('schutzbleche'),        // Spalte AE
+            getMultiPhotoCountText('schutzbleche'),   // Spalte AF
+            getValue('beleuchtung'),         // Spalte AG
+            getMultiPhotoCountText('beleuchtung'),    // Spalte AH
+            getValue('vorbau'),              // Spalte AI
+            getMultiPhotoCountText('vorbau'),         // Spalte AJ
+            getValue('kettenkasten'),        // Spalte AK
+            getMultiPhotoCountText('kettenkasten'),    // Spalte AL
+            getValue('motorcover'),          // Spalte AM
+            getMultiPhotoCountText('motorcover'),     // Spalte AN
+            getValue('batteriecover'),       // Spalte AO
+            getMultiPhotoCountText('batteriecover'),  // Spalte AP
+            getValue('chargeport'),          // Spalte AQ
+            getMultiPhotoCountText('chargeport'),     // Spalte AR
+            getValue('sattelrohrklemme'),    // Spalte AS
+            getMultiPhotoCountText('sattelrohrklemme'),// Spalte AT
+            getValue('besonderheiten'),      // Spalte AU
+            getMultiPhotoCountText('besonderheiten')  // Spalte AV
+        ];
+    }
+
+    function generateCSVString() {
+        const headers = [
+            "Marke","Modell","Modelljahr","Kategorie","UVP","Foto_Seitenansicht","Foto_Front","Foto_Motor","Foto_Heck","Foto_Detail",
+            "Rahmenmaterial","Rahmenform","Schweissnaht_Finish","Kabelfuehrung","Gabel","Sattelstuetze","Motor_Modell","Drehmoment_Nm",
+            "Akku_Wh","Akku_Integration","Display","Schaltungstyp","Schaltung_Modell","Antriebsmedium","Bremse",
+            "Bremsscheiben","Laufraeder","Bereifung",
+            "Gepaecktraeger_Spec","Gepaecktraeger_Fotos",
+            "Schutzblech_Spec","Schutzblech_Fotos",
+            "Beleuchtung_Spec","Beleuchtung_Fotos",
+            "Vorbau_Lenker_Spec","Vorbau_Lenker_Fotos",
+            "Kettenkasten_Spec","Kettenkasten_Fotos",
+            "Motorcover_Spec","Motorcover_Fotos",
+            "Batteriecover_Spec","Batteriecover_Fotos",
+            "ChargePortCover_Spec","ChargePortCover_Fotos",
+            "Sattelrohrklemme_Spec","Sattelrohrklemme_Fotos",
+            "Besonderheiten_Spec","Besonderheiten_Fotos"
+        ];
+        const data = collectMasterData();
+        const formatRow = row => row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(';');
+        return formatRow(headers) + "\n" + formatRow(data);
+    }
+
+    /* PURE JS ZIP BUILDER ENGINE */
+    class PureZip {
+        constructor() { this.files = []; }
+
+        crc32(u8Array) {
+            let table = new Uint32Array(256);
+            for (let i = 0; i < 256; i++) {
+                let c = i;
+                for (let j = 0; j < 8; j++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+                table[i] = c;
+            }
+            let crc = 0xFFFFFFFF;
+            for (let i = 0; i < u8Array.length; i++) crc = (crc >>> 8) ^ table[(crc ^ u8Array[i]) & 0xFF];
+            return (crc ^ 0xFFFFFFFF) >>> 0;
+        }
+
+        addFile(filename, uint8Data) {
+            this.files.push({ name: filename, data: uint8Data, crc: this.crc32(uint8Data), size: uint8Data.length });
+        }
+
+        buildBlob() {
+            const encoder = new TextEncoder();
+            let parts = [], centralDir = [], offset = 0;
+
+            for (let file of this.files) {
+                const nameBytes = encoder.encode(file.name);
+                const header = new Uint8Array(30 + nameBytes.length);
+                const view = new DataView(header.buffer);
+                view.setUint32(0, 0x04034b50, true);
+                view.setUint16(4, 10, true);
+                view.setUint32(14, file.crc, true);
+                view.setUint32(18, file.size, true);
+                view.setUint32(22, file.size, true);
+                view.setUint16(26, nameBytes.length, true);
+                header.set(nameBytes, 30);
+
+                parts.push(header, file.data);
+
+                const cdHeader = new Uint8Array(46 + nameBytes.length);
+                const cdView = new DataView(cdHeader.buffer);
+                cdView.setUint32(0, 0x02014b50, true);
+                cdView.setUint16(4, 20, true);
+                cdView.setUint16(6, 10, true);
+                cdView.setUint32(16, file.crc, true);
+                cdView.setUint32(20, file.size, true);
+                cdView.setUint32(24, file.size, true);
+                cdView.setUint16(28, nameBytes.length, true);
+                cdView.setUint32(42, offset, true);
+                cdHeader.set(nameBytes, 46);
+
+                centralDir.push(cdHeader);
+                offset += header.length + file.size;
+            }
+
+            let centralDirOffset = offset, centralDirSize = 0;
+            for (let cd of centralDir) { parts.push(cd); centralDirSize += cd.length; }
+
+            const eocd = new Uint8Array(22);
+            const eocdView = new DataView(eocd.buffer);
+            eocdView.setUint32(0, 0x06054b50, true);
+            eocdView.setUint16(8, this.files.length, true);
+            eocdView.setUint16(10, this.files.length, true);
+            eocdView.setUint32(12, centralDirSize, true);
+            eocdView.setUint32(16, centralDirOffset, true);
+
+            parts.push(eocd);
+            return new Blob(parts, { type: 'application/zip' });
+        }
+    }
+
+    function dataURLToUint8Array(dataUrl) {
+        const bstr = atob(dataUrl.split(','));
+        let n = bstr.length, u8arr = new Uint8Array(n);
+        while (n--) u8arr[n] = bstr.charCodeAt(n);
+        return u8arr;
+    }
+
+    /* DOWNLOAD HANDLERS */
+    function downloadZipPackage() {
+        const zip = new PureZip();
+        
+        // 1. CSV
+        const csvText = generateCSVString();
+        const encoder = new TextEncoder();
+        const csvBytes = new Uint8Array([0xEF, 0xBB, 0xBF, ...encoder.encode(csvText)]);
+        zip.addFile("benchmark_data.csv", csvBytes);
+
+        // 2. Single Photos from Step 2
+        const singlePhotoMap = [
+            { id: 'prevSeite', name: '01_Seitenansicht_Antriebsseite.jpg' },
+            { id: 'prevFront', name: '02_Front_Kabelfuehrung.jpg' },
+            { id: 'prevMotor', name: '03_Tretlager_Motorintegration.jpg' },
+            { id: 'prevHeck', name: '04_Gepaecktraeger_Schutzblech.jpg' },
+            { id: 'prevDetail', name: '05_Schweissnaht_Verarbeitung.jpg' }
+        ];
+
+        singlePhotoMap.forEach(item => {
+            const imgEl = document.getElementById(item.id);
+            if (imgEl && imgEl.src && imgEl.src.startsWith('data:image')) {
+                zip.addFile(item.name, dataURLToUint8Array(imgEl.src));
+            }
+        });
+
+        // 3. Multi Photos from ALL Step 5 Topics
+        const multiPhotoTopicPrefixes = {
+            gepaecktraeger: "06_Gepaecktraeger",
+            schutzbleche: "07_Schutzblech",
+            beleuchtung: "08_Beleuchtung",
+            vorbau: "09_VorbauLenker",
+            kettenkasten: "10_Kettenkasten",
+            motorcover: "11_Motorcover",
+            batteriecover: "12_Batteriecover",
+            chargeport: "13_ChargePortCover",
+            sattelrohrklemme: "14_Sattelrohrklemme",
+            besonderheiten: "15_Besonderheiten"
+        };
+
+        Object.keys(multiPhotos).forEach(topicKey => {
+            const prefix = multiPhotoTopicPrefixes[topicKey];
+            multiPhotos[topicKey].forEach((dataUrl, index) => {
+                const filename = `${prefix}_${index + 1}.jpg`;
+                zip.addFile(filename, dataURLToUint8Array(dataUrl));
+            });
+        });
+
+        // Trigger Download
+        const blob = zip.buildBlob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const modellSlug = getValue('modell').replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        a.download = `benchmark_${modellSlug || 'bike'}.zip`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }
+
+    function generateExportCSV() {
+        const csvContent = generateCSVString();
+        const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const modellSlug = getValue('modell').replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        a.download = `benchmark_${modellSlug || 'bike'}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }
+
+    function copyToClipboard() {
+        const data = collectMasterData();
+        navigator.clipboard.writeText(data.join('\t')).then(() => {
+            alert("✅ Zeile kopiert! Du kannst sie jetzt direkt in dein Google Sheets Master-Dokument (Spalte A) einfügen.");
+        });
+    }
+</script>
+
+</body>
+</html>
